@@ -11,7 +11,8 @@ Documentación general: [hotdog-docs](https://github.com/SeguridadInfromacion/ho
 | Método | Ruta | Quién | Qué hace |
 |---|---|---|---|
 | POST | `/api/auth/login` | cualquiera | Inicia sesión y entrega la cookie de sesión |
-| POST | `/api/auth/logout` | cualquiera | Borra la cookie de sesión |
+| POST | `/api/auth/refresh` | con sesión | Cambia el token vigente por uno nuevo |
+| POST | `/api/auth/logout` | cualquiera | Invalida el token y borra la cookie |
 | GET | `/api/auth/me` | con sesión | Usuario actual |
 | GET | `/api/auth/audit` | admin | Bitácora de este servicio |
 | GET | `/api/users` | admin | Lista de usuarios |
@@ -27,7 +28,12 @@ Documentación general: [hotdog-docs](https://github.com/SeguridadInfromacion/ho
   cuerpo de la respuesta y el JavaScript no puede leerlo.
 - **Sin enumeración de usuarios.** Mismo mensaje y mismo tiempo de respuesta
   exista o no el usuario, esté o no bloqueado.
-- **Bloqueo de cuenta** de 15 minutos tras 5 intentos fallidos.
+- **Bloqueo por usuario + IP** de 15 minutos tras 5 intentos fallidos. Al ser
+  por pareja, un extraño no puede dejar por fuera al dueño de la cuenta.
+- **Tokens cortos y revocables.** Duran 10 minutos y se renuevan solos hasta un
+  tope de 10 horas. Cerrar sesión, cambiar la contraseña o el rol, o desactivar
+  al usuario invalida los tokens que ya tenía.
+- **Los errores de validación no devuelven lo enviado**, que podría ser una contraseña.
 - **Entradas estrictas.** Pydantic valida todo y rechaza campos desconocidos.
 - **Auditoría** de cada inicio de sesión (correcto o fallido) y cada cambio de usuarios.
 
@@ -69,7 +75,9 @@ Para ejecutarlo junto al resto del sistema, usa
 | `DATABASE_URL` | sí | Conexión a PostgreSQL |
 | `JWT_PRIVATE_KEY_FILE` | sí | Ruta a la llave privada RSA (PEM) |
 | `JWT_PUBLIC_KEY_FILE` | sí | Ruta a la llave pública RSA (PEM) |
-| `ACCESS_TOKEN_MINUTES` | no (60) | Duración de la sesión |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | no | Administrador inicial, si no hay usuarios |
+| `ACCESS_TOKEN_MINUTES` | no (10) | Duración de cada token |
+| `SESSION_HOURS` | no (10) | Tope absoluto de una sesión, aunque se renueve |
+| `FORWARDED_ALLOW_IPS` | no | Dirección del gateway: solo a él se le cree la IP del cliente |
+| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | con la base vacía | Administrador inicial; sin ellos el servicio no arranca |
 | `DEMO_CASHIER_USERNAME`, `DEMO_CASHIER_PASSWORD` | no | Cajero inicial, si no hay usuarios |
 | `ENABLE_DOCS` | no (false) | Activa `/docs` (solo para desarrollo) |

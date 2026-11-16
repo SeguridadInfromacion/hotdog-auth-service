@@ -35,7 +35,7 @@ def require_csrf_header(request: Request) -> None:
         raise PermissionDenied("Petición rechazada: falta la cabecera de seguridad.")
 
 
-def _extract_token(request: Request) -> str | None:
+def extract_token(request: Request) -> str | None:
     cookie = request.cookies.get(SESSION_COOKIE)
     if cookie:
         return cookie
@@ -44,13 +44,14 @@ def _extract_token(request: Request) -> str | None:
 
 
 def get_current_user(request: Request, session: SessionDep) -> User:
-    token = _extract_token(request)
+    token = extract_token(request)
     if token is None:
         raise NotAuthenticated
     claims = decode_token(token)
-    # Aquí sí se consulta la base: un usuario desactivado deja de entrar de inmediato.
+    # Aquí sí se consulta la base: un usuario desactivado, o un token emitido antes
+    # de cambiar la contraseña o cerrar sesión, deja de valer de inmediato.
     user = UserRepository(session).get(claims.user_id)
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.token_version != claims.token_version:
         raise NotAuthenticated
     return user
 

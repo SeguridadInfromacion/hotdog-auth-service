@@ -9,11 +9,14 @@ from pydantic import BaseModel, ConfigDict, StringConstraints, field_validator
 
 USERNAME_PATTERN = r"^[a-z0-9_.-]{3,32}$"
 
-Username = Annotated[
-    str,
-    StringConstraints(strip_whitespace=True, to_lower=True, pattern=USERNAME_PATTERN),
+# Sin caracteres de control (saltos de línea, NUL...): no sirven en un nombre y
+# permitirían falsificar líneas del log o provocar errores en la base.
+PRINTABLE = r"^[^\x00-\x1f\x7f]*$"
+
+Username = Annotated[str, StringConstraints(strip_whitespace=True, pattern=USERNAME_PATTERN)]
+FullName = Annotated[
+    str, StringConstraints(strip_whitespace=True, min_length=2, max_length=80, pattern=PRINTABLE)
 ]
-FullName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=2, max_length=80)]
 Role = Literal["admin", "cashier"]
 
 
@@ -32,7 +35,10 @@ class StrictModel(BaseModel):
 
 
 class LoginIn(StrictModel):
-    username: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=32)]
+    username: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=32, pattern=PRINTABLE),
+    ]
     password: Annotated[str, StringConstraints(min_length=1, max_length=128)]
 
 

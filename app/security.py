@@ -2,7 +2,7 @@
 
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 
 import jwt
@@ -40,6 +40,8 @@ class TokenClaims:
     user_id: uuid.UUID
     username: str
     role: str
+    token_version: int
+    session_started_at: datetime
 
 
 @lru_cache
@@ -52,16 +54,22 @@ def _public_key() -> str:
     return get_settings().jwt_public_key_file.read_text(encoding="utf-8")
 
 
-def issue_token(user: User) -> tuple[str, datetime]:
-    """Firma un token para el usuario. Devuelve el token y cuándo vence."""
+def issue_token(user: User, session_started_at: datetime | None = None) -> tuple[str, datetime]:
+    """Firma un token para el usuario. Devuelve el token y cuándo vence.
+
+    Al renovar se conserva session_started_at: así la sesión tiene un tope absoluto.
+    """
     settings = get_settings()
     issued_at = utcnow()
+    session_started_at = session_started_at or issued_at
     expires_at = issued_at + timedelta(minutes=settings.access_token_minutes)
     payload = {
         "sub": str(user.id),
         "username": user.username,
         "name": user.full_name,
         "role": user.role,
+        "ver": user.token_version,
+        "auth_time": int(session_started_at.timestamp()),
         "iss": settings.jwt_issuer,
         "aud": settings.jwt_audience,
         "iat": issued_at,
@@ -87,6 +95,15 @@ def decode_token(token: str) -> TokenClaims:
             user_id=uuid.UUID(payload["sub"]),
             username=str(payload["username"]),
             role=str(payload["role"]),
+            token_version=int(payload["ver"]),
+            session_started_at=datetime.fromtimestamp(int(payload["auth_time"]), UTC),
         )
-    except (jwt.InvalidTokenError, KeyError, ValueError) as error:
+    except (
+        jwt.InvalidTokenError,
+        KeyError,
+        TypeError,
+        ValueError,
+        OverflowError,
+        OSError,
+    ) as error:
         raise NotAuthenticated("Tu sesión no es válida o ya venció.") from error

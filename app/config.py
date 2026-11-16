@@ -15,7 +15,11 @@ class Settings(BaseSettings):
     jwt_public_key_file: Path
     jwt_issuer: str = "hotdog-auth"
     jwt_audience: str = "hotdog-api"
-    access_token_minutes: int = Field(default=60, ge=5, le=480)
+    # Token corto que el navegador renueva solo mientras la caja está abierta:
+    # si se desactiva a un usuario, los demás servicios dejan de aceptarlo en minutos.
+    access_token_minutes: int = Field(default=10, ge=2, le=120)
+    # Tope absoluto de una sesión, por más que se renueve (un turno de trabajo).
+    session_hours: int = Field(default=10, ge=1, le=24)
 
     cookie_secure: bool = True
     max_failed_logins: int = Field(default=5, ge=3, le=20)
